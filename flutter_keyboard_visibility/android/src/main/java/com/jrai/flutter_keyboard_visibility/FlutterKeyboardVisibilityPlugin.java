@@ -1,12 +1,13 @@
 package com.jrai.flutter_keyboard_visibility;
 
 import android.app.Activity;
+import android.graphics.Rect;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 
-import androidx.core.view.OnApplyWindowInsetsListener;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
+
+import androidx.annotation.NonNull;
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.embedding.engine.plugins.activity.ActivityAware;
@@ -16,13 +17,13 @@ import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.PluginRegistry;
 
 
-public class FlutterKeyboardVisibilityPlugin implements FlutterPlugin, ActivityAware, EventChannel.StreamHandler {
+public class FlutterKeyboardVisibilityPlugin implements FlutterPlugin, ActivityAware, EventChannel.StreamHandler, ViewTreeObserver.OnGlobalLayoutListener {
   private EventChannel.EventSink eventSink;
   private View mainView;
   private boolean isVisible;
 
   @Override
-  public void onAttachedToEngine(FlutterPluginBinding flutterPluginBinding) {
+  public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
     init(flutterPluginBinding.getBinaryMessenger());
   }
 
@@ -38,7 +39,6 @@ public class FlutterKeyboardVisibilityPlugin implements FlutterPlugin, ActivityA
   public static void registerWith(PluginRegistry.Registrar registrar) {
     final FlutterKeyboardVisibilityPlugin plugin = new FlutterKeyboardVisibilityPlugin();
     plugin.init(registrar.messenger());
-    plugin.listenForKeyboard(registrar.activity());
   }
 
   private void init(BinaryMessenger messenger) {
@@ -47,12 +47,12 @@ public class FlutterKeyboardVisibilityPlugin implements FlutterPlugin, ActivityA
   }
 
   @Override
-  public void onDetachedFromEngine(FlutterPluginBinding binding) {
+  public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
     unregisterListener();
   }
 
   @Override
-  public void onAttachedToActivity(ActivityPluginBinding binding) {
+  public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
     listenForKeyboard(binding.getActivity());
   }
 
@@ -62,7 +62,7 @@ public class FlutterKeyboardVisibilityPlugin implements FlutterPlugin, ActivityA
   }
 
   @Override
-  public void onReattachedToActivityForConfigChanges(ActivityPluginBinding binding) {
+  public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
     listenForKeyboard(binding.getActivity());
   }
 
@@ -81,25 +81,34 @@ public class FlutterKeyboardVisibilityPlugin implements FlutterPlugin, ActivityA
     this.eventSink = null;
   }
 
+  @Override
+  public void onGlobalLayout() {
+    Rect r = new Rect();
 
-  private void listenForKeyboard(Activity activity) {
-    mainView = activity.<ViewGroup>findViewById(android.R.id.content);
+    if (mainView != null) {
+      mainView.getWindowVisibleDisplayFrame(r);
 
-    ViewCompat.setOnApplyWindowInsetsListener(mainView, new OnApplyWindowInsetsListener() {
-      @Override
-      public WindowInsetsCompat onApplyWindowInsets(View v, WindowInsetsCompat insets) {
-        isVisible = insets.isVisible(WindowInsetsCompat.Type.ime());
+      // check if the visible part of the screen is less than 85%
+      // if it is then the keyboard is showing
+      boolean newState = ((double)r.height() / (double)mainView.getRootView().getHeight()) < 0.85;
+
+      if (newState != isVisible) {
+        isVisible = newState;
         if (eventSink != null) {
           eventSink.success(isVisible ? 1 : 0);
         }
-        return insets;
       }
-    });
+    }
+  }
+
+  private void listenForKeyboard(Activity activity) {
+    mainView = activity.<ViewGroup>findViewById(android.R.id.content);
+    mainView.getViewTreeObserver().addOnGlobalLayoutListener(this);
   }
 
   private void unregisterListener() {
     if (mainView != null) {
-      ViewCompat.setOnApplyWindowInsetsListener(mainView,null);
+      mainView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
       mainView = null;
     }
   }
