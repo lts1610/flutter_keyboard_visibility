@@ -55,13 +55,13 @@
 
 - (void)willShow
 {
-    // if state changed and we have a subscriber, let him know
-    if (!self.isVisible) {
-        self.isVisible = YES;
-        if (self.flutterEventListening) {
-            self.flutterEventSink([NSNumber numberWithInt:1]);
-        }
-    }
+    // // if state changed and we have a subscriber, let him know
+    // if (!self.isVisible) {
+    //     self.isVisible = YES;
+    //     if (self.flutterEventListening) {
+    //         self.flutterEventSink([NSNumber numberWithInt:1]);
+    //     }
+    // }
 }
 
 - (void)didHide
